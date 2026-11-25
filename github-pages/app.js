@@ -1,6 +1,6 @@
 /* =========================================================================
  * SETTINGS — edit these to change the available colors and grid.
- * Each built-in color needs: label (shown in UI/legend), color (any CSS color),
+ * Each color needs: label (shown in the picker), color (any CSS color),
  * and key (single lowercase letter used as a desktop shortcut).
  * ========================================================================= */
 const CONFIG = {
@@ -9,21 +9,25 @@ const CONFIG = {
   defaultPlateColor: "#000000",
   defaultLogoColor: "#ffffff",
   colors: [
-    { label: "Red", color: "#e5484d", key: "r" },
-    { label: "Orange", color: "#f76808", key: "o" },
-    { label: "Yellow", color: "#f5d90a", key: "y" },
-    { label: "Green", color: "#46a758", key: "g" },
-    { label: "Blue", color: "#3b82f6", key: "b" },
-    { label: "Pink", color: "#f63bdd", key: "i" },
-    { label: "Purple", color: "#8e4ec6", key: "p" },
-    { label: "White", color: "#ffffff", key: "w" },
-    { label: "Gray", color: "#999999", key: "n" },
-    { label: "Black", color: "#222222", key: "k" },
+    { label: "Pink", color: "#F55A74", key: "i" },
+    { label: "Red", color: "#C12E1F", key: "r" },
+    { label: "Orange", color: "#FF9016", key: "o" },
+    { label: "Yellow", color: "#F4EE2A", key: "y" },
+    { label: "Bright Green", color: "#BECF00", key: "t" },
+    { label: "Grass Green", color: "#61C680", key: "g" },
+    { label: "Bambu Green", color: "#00AE42", key: "a" },
+    { label: "Mistletoe Green", color: "#3F8E43", key: "m" },
+    { label: "Cobalt Blue", color: "#0056B8", key: "c" },
+    { label: "Blue", color: "#0A2989", key: "b" },
+    { label: "Purple", color: "#5E43B7", key: "p" },
+    { label: "Indigo Purple", color: "#482960", key: "d" },
+    { label: "White", color: "#FFFFFF", key: "w" },
+    { label: "Black", color: "#000000", key: "k" },
   ],
 };
 /* ===================== end of settings =================================== */
 
-const STORAGE_KEY = "nameplate-planner-v1";
+const STORAGE_KEY = "nameplate-planner-v2";
 const SHAPES = Object.freeze({
   heart: [
     ".##.##.",
@@ -85,7 +89,6 @@ function validZoom(value, fallback) {
 }
 
 const { rows, cols, colors } = CONFIG;
-const BUILT_IN_COLOR_COUNT = colors.length;
 
 function getNameplateMetrics(cell, { showLogo = true } = {}) {
   const gap = cell * NAMEPLATE_LAYOUT.gapRatio;
@@ -260,7 +263,6 @@ const el = {
   plate: null,
   grid: null,
   palette: document.getElementById("palette"),
-  customColor: document.getElementById("custom-color"),
   stage: document.getElementById("stage"),
   plateTheme: document.getElementById("plate-theme"),
   clearAll: document.getElementById("clear-all"),
@@ -322,100 +324,8 @@ function buildPalette() {
     btn.innerHTML = `<span class="count" data-count="${i}">0</span>`;
     btn.addEventListener("click", () => setActive(i));
     wrap.appendChild(btn);
-    if (color.custom) {
-      wrap.classList.add("custom-swatch-wrap");
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "remove-color";
-      remove.textContent = "×";
-      remove.title = `Remove ${color.label}`;
-      remove.setAttribute("aria-label", `Remove ${color.label}`);
-      remove.addEventListener("click", () => removeCustomColor(i));
-      wrap.appendChild(remove);
-    }
     el.palette.appendChild(wrap);
   });
-
-  const add = document.createElement("label");
-  add.className = "swatch add-color";
-  add.htmlFor = "custom-color";
-  add.dataset.tip = "Add";
-  add.title = "Add";
-  add.setAttribute("aria-label", "Add custom color");
-  add.tabIndex = 0;
-  add.textContent = "+";
-  add.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      el.customColor.click();
-    }
-  });
-  el.palette.appendChild(add);
-}
-
-function customColorValues() {
-  return colors.slice(BUILT_IN_COLOR_COUNT).map((color) => color.color);
-}
-
-function restoreCustomColors(values, legacyValue) {
-  colors.splice(BUILT_IN_COLOR_COUNT);
-  const customValues = Array.isArray(values)
-    ? values
-    : typeof legacyValue === "string"
-      ? [legacyValue]
-      : [];
-  customValues
-    .filter((value) => /^#[0-9a-f]{6}$/i.test(value))
-    .forEach((color, index) => {
-      colors.push({
-        label: color,
-        color,
-        number: index + 1,
-        key: index < 9 ? String(index + 1) : null,
-        custom: true,
-      });
-    });
-  if (state.active >= colors.length) state.active = 0;
-}
-
-function addCustomColor(value) {
-  if (!/^#[0-9a-f]{6}$/i.test(value)) return;
-  const number = colors.length - BUILT_IN_COLOR_COUNT + 1;
-  colors.push({
-    label: value,
-    color: value,
-    number,
-    key: number < 10 ? String(number) : null,
-    custom: true,
-  });
-  buildPalette();
-  updateCounts();
-  setActive(colors.length - 1);
-  save();
-  recordHistory();
-}
-
-function removeCustomColor(index) {
-  if (index < BUILT_IN_COLOR_COUNT || index >= colors.length) return;
-  colors.splice(index, 1);
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++) {
-      const value = state.grid[r][c];
-      if (value === index) state.grid[r][c] = null;
-      else if (value !== null && value > index) state.grid[r][c] = value - 1;
-    }
-  colors.slice(BUILT_IN_COLOR_COUNT).forEach((color, customIndex) => {
-    const number = customIndex + 1;
-    color.number = number;
-    color.key = number < 10 ? String(number) : null;
-  });
-  if (state.active === index) state.active = 0;
-  else if (state.active > index) state.active--;
-  buildPalette();
-  repaintAll();
-  updateCounts();
-  save();
-  recordHistory();
 }
 
 // Relative brightness (0–1) of a hex color.
@@ -798,8 +708,7 @@ function onKeyDown(e) {
 /* --------------------------------------------------------------------- */
 /* Persistence                                                           */
 /* --------------------------------------------------------------------- */
-// Store one nullable color index per cell so the palette can grow without an
-// encoding limit. String decoding below keeps older saved designs compatible.
+// Store one nullable color index per cell.
 function encodeGrid() {
   const encoded = [];
   for (let r = 0; r < rows; r++)
@@ -848,7 +757,6 @@ function save() {
         textSize: state.textSize,
         textAlign: state.textAlign,
         zooms: state.zooms,
-        customColors: customColorValues(),
       })
     );
   } catch (_) {
@@ -865,7 +773,6 @@ function load() {
   }
   if (!data) return;
 
-  restoreCustomColors(data.customColors, data.custom);
   applyGridString(data.g);
   if (typeof data.active === "number" && data.active < colors.length)
     state.active = data.active;
@@ -899,7 +806,6 @@ function captureHistoryState() {
     grid: state.grid.map((row) => [...row]),
     plateColor: state.plateColor,
     logoColor: state.logoColor,
-    customColors: customColorValues(),
   };
 }
 
@@ -926,7 +832,6 @@ function recordHistory() {
 }
 
 function restoreHistoryState(snapshot) {
-  restoreCustomColors(snapshot.customColors);
   state.grid = snapshot.grid.map((row) => [...row]);
   state.active = Math.min(state.active, colors.length - 1);
   state.plateColor = snapshot.plateColor;
@@ -1142,9 +1047,6 @@ function init() {
     save();
     recordHistory();
   });
-  el.customColor.addEventListener("change", (e) =>
-    addCustomColor(e.target.value)
-  );
   el.clearAll.addEventListener("click", clearAll);
   el.shiftLeft.addEventListener("click", () => shiftColumns(-1));
   el.shiftRight.addEventListener("click", () => shiftColumns(1));

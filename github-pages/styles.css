@@ -389,8 +389,7 @@ main {
 }
 
 /* Palette --------------------------------------------------------------- */
-/* Fixed 8-across grid so all swatches stay on one row and never orphan-wrap;
-   width is capped so they don't balloon on desktop and centered by the group. */
+/* Cap swatch width on desktop and let the palette wrap on smaller screens. */
 .toolbar-colors {
   width: 100%;
   flex-wrap: nowrap;
@@ -402,18 +401,10 @@ main {
   align-items: start;
   gap: var(--space-2);
   width: 100%;
-  max-width: 680px;
+  max-width: 800px;
   min-width: 0;
   flex: 1 1 auto;
   margin: 0 auto;
-}
-
-.visually-hidden-color {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .swatch-wrap {
@@ -439,52 +430,6 @@ main {
     box-shadow 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
 }
 
-.add-color {
-  border-style: dashed;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 1.6rem;
-  font-weight: 400;
-  padding-bottom: 3px;
-}
-
-.remove-color {
-  position: absolute;
-  top: calc(100% + 5px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  padding: 0 0 2px;
-  background: var(--panel);
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.16s ease;
-}
-
-.swatch[aria-pressed="true"] + .remove-color {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.remove-color:hover {
-  border-color: var(--muted);
-  color: var(--text);
-}
-
 /* Recede the unselected swatches so the active one clearly stands out. */
 .swatch:not([aria-pressed="true"]) {
   opacity: 0.45;
@@ -504,17 +449,6 @@ main {
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
   border-color: rgba(0, 0, 0, 0.3);
   z-index: 2;
-}
-
-.add-color:not([aria-pressed="true"]) {
-  opacity: 1;
-  filter: none;
-  transform: none;
-}
-
-.add-color:not([aria-pressed="true"]):hover {
-  opacity: 1;
-  transform: translateY(-1px);
 }
 
 .swatch .count {
@@ -615,7 +549,7 @@ main {
   .palette {
     grid-column: 1 / -1;
     grid-row: 1;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
     gap: 8px;
     max-width: none;
   }
