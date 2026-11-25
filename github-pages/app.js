@@ -171,13 +171,8 @@ function emptyCellColor(plateColor) {
 }
 
 function setNameplateColors(plate, plateColor, logoColor) {
-  const dark = luminance(plateColor) < 0.3;
   plate.style.setProperty("--nameplate-plate-color", plateColor);
   plate.style.setProperty("--nameplate-logo-color", logoColor);
-  plate.style.setProperty(
-    "--nameplate-label-color",
-    dark ? "#ffffff" : "#1f2328"
-  );
   plate.style.setProperty("--nameplate-empty-color", emptyCellColor(plateColor));
 }
 
@@ -193,7 +188,6 @@ function createNameplate({
   plateColor = CONFIG.defaultPlateColor,
   logoColor = CONFIG.defaultLogoColor,
   interactive = false,
-  showColumnNumbers = false,
   showEmptyCells = true,
   showLogo = true,
   showShadow = true,
@@ -223,22 +217,6 @@ function createNameplate({
 
   const gridArea = document.createElement("div");
   gridArea.className = "nameplate-grid-area";
-
-  let columnNumbers = null;
-  if (interactive || showColumnNumbers) {
-    columnNumbers = document.createElement("div");
-    columnNumbers.className = "nameplate-column-numbers";
-    columnNumbers.setAttribute("aria-hidden", "true");
-    columnNumbers.hidden = !showColumnNumbers;
-    for (let column = 5; column <= cols; column += 5) {
-      const label = document.createElement("span");
-      label.className = "nameplate-column-number";
-      label.textContent = String(column);
-      label.style.setProperty("--column", column);
-      columnNumbers.appendChild(label);
-    }
-    gridArea.appendChild(columnNumbers);
-  }
 
   const gridElement = document.createElement("div");
   gridElement.className = "nameplate-grid";
@@ -272,7 +250,7 @@ function createNameplate({
   gridArea.appendChild(gridElement);
   plate.appendChild(gridArea);
 
-  return { plate, grid: gridElement, columnNumbers, cells };
+  return { plate, grid: gridElement, cells };
 }
 
 function fitNameplateToWidth(plate, width, zoom = 1, maxCell = Infinity) {
@@ -298,7 +276,6 @@ const state = {
   textValue: "",
   textSize: "regular", // letter width for the write-a-word tool
   textAlign: "left",
-  showColumnNumbers: false,
 };
 
 // DOM references
@@ -307,8 +284,6 @@ const el = {
   plate: null,
   grid: null,
   palette: document.getElementById("palette"),
-  columnNumbers: null,
-  showColumnNumbers: document.getElementById("show-column-numbers"),
   customColor: document.getElementById("custom-color"),
   stage: document.getElementById("stage"),
   plateTheme: document.getElementById("plate-theme"),
@@ -316,8 +291,6 @@ const el = {
   uploadDesign: document.getElementById("upload-design"),
   designFile: document.getElementById("design-file"),
   downloadImage: document.getElementById("download-image"),
-  downloadCounts: document.getElementById("download-counts"),
-  downloadDesign: document.getElementById("download-design"),
   shiftLeft: document.getElementById("shift-left"),
   shiftRight: document.getElementById("shift-right"),
   undo: document.getElementById("undo"),
@@ -326,10 +299,6 @@ const el = {
   zoomIn: document.getElementById("zoom-in"),
   zoomOut: document.getElementById("zoom-out"),
   zoomLabel: document.getElementById("zoom-label"),
-  menuBtn: document.getElementById("menu-btn"),
-  drawer: document.getElementById("drawer"),
-  drawerOverlay: document.getElementById("drawer-overlay"),
-  drawerClose: document.getElementById("drawer-close"),
   textInput: document.getElementById("text-input"),
   saveDesignBtn: document.getElementById("save-design"),
   uploadSavedDesign: document.getElementById("upload-saved-design"),
@@ -353,7 +322,6 @@ function buildGrid() {
     plateColor: state.plateColor,
     logoColor: state.logoColor,
     interactive: true,
-    showColumnNumbers: state.showColumnNumbers,
     onCellClick(row, column, cell) {
       toggleCell(row, column, state.active);
       cell.blur();
@@ -362,7 +330,6 @@ function buildGrid() {
   el.nameplateHost.replaceChildren(rendered.plate);
   el.plate = rendered.plate;
   el.grid = rendered.grid;
-  el.columnNumbers = rendered.columnNumbers;
   for (const row of rendered.cells) cellEls.push(row);
   enableMouseDragPainting();
 }
@@ -940,7 +907,6 @@ function save() {
         text: state.textValue,
         textSize: state.textSize,
         textAlign: state.textAlign,
-        showColumnNumbers: state.showColumnNumbers,
         zooms: state.zooms,
         customColors: customColorValues(),
       })
@@ -966,8 +932,6 @@ function load() {
   if (typeof data.plate === "string") state.plateColor = data.plate;
   if (typeof data.logo === "string") state.logoColor = data.logo;
   if (typeof data.text === "string") state.textValue = data.text;
-  if (typeof data.showColumnNumbers === "boolean")
-    state.showColumnNumbers = data.showColumnNumbers;
   if (data.zooms && typeof data.zooms === "object") {
     state.zooms.portrait = validZoom(
       data.zooms.portrait,
@@ -1064,13 +1028,6 @@ function prepareExportCanvas(width, height, scale = 2) {
   const ctx = canvas.getContext("2d");
   ctx.scale(scale, scale);
   return { canvas, ctx };
-}
-
-function downloadCanvas(canvas, filename) {
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = canvas.toDataURL("image/png");
-  link.click();
 }
 
 function downloadBlob(blob, filename) {
@@ -1252,50 +1209,6 @@ async function downloadImage(source = {}) {
   }
 }
 
-function downloadCounts() {
-  const counts = updateCounts();
-  const used = colors
-    .map((c, i) => ({ ...c, count: counts[i] }))
-    .filter((c) => c.count > 0);
-  const scale = 2;
-  const pad = 24;
-  const titleH = 28;
-  const legendRowH = 30;
-  const contentRows = Math.max(used.length, 1);
-  const width = 360;
-  const height = pad + titleH + contentRows * legendRowH + pad;
-  const { canvas, ctx } = prepareExportCanvas(width, height, scale);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = "#1f2328";
-  ctx.font = "700 18px -apple-system, Segoe UI, Arial, sans-serif";
-  ctx.textBaseline = "middle";
-  ctx.fillText("Inserts needed", pad, pad + titleH / 2);
-  if (used.length) {
-    used.forEach((c, i) => {
-      const y = pad + titleH + i * legendRowH + legendRowH / 2;
-      ctx.fillStyle = c.color;
-      roundRect(ctx, pad, y - 10, 20, 20, 5);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.15)";
-      ctx.lineWidth = 1;
-      roundRect(ctx, pad, y - 10, 20, 20, 5);
-      ctx.stroke();
-      ctx.fillStyle = "#1f2328";
-      ctx.font = "400 16px -apple-system, Segoe UI, Arial, sans-serif";
-      ctx.fillText(`${c.label} — ${c.count}`, pad + 30, y);
-    });
-  } else {
-    ctx.fillStyle = "#656d76";
-    ctx.font = "400 16px -apple-system, Segoe UI, Arial, sans-serif";
-    ctx.fillText("No inserts needed", pad, pad + titleH + legendRowH / 2);
-  }
-
-  downloadCanvas(canvas, "nameplate-counts.png");
-}
-
 function createDownloadDesign({
   grid = state.grid,
   plateColor = state.plateColor,
@@ -1313,19 +1226,6 @@ function createDownloadDesign({
   };
   if (customColors.length) design.customColors = customColors;
   return design;
-}
-
-function downloadDesign() {
-  const design = createDownloadDesign();
-  if (!design) {
-    alert("Design downloads support up to 35 custom colors.");
-    return;
-  }
-
-  const blob = new Blob([JSON.stringify(design, null, 2) + "\n"], {
-    type: "application/json",
-  });
-  downloadBlob(blob, "nameplate-design.json");
 }
 
 function drawLogoOnCanvas(ctx, x, y, size, logoColor) {
@@ -1432,28 +1332,6 @@ function addShape(shapeName) {
   updateCounts();
   save();
   recordHistory();
-}
-
-/* --------------------------------------------------------------------- */
-/* Side menu (drawer)                                                    */
-/* --------------------------------------------------------------------- */
-function openMenu() {
-  el.drawer.classList.add("open");
-  el.drawerOverlay.classList.add("open");
-  el.drawer.setAttribute("aria-hidden", "false");
-  el.menuBtn.setAttribute("aria-expanded", "true");
-}
-
-function closeMenu() {
-  el.drawer.classList.remove("open");
-  el.drawerOverlay.classList.remove("open");
-  el.drawer.setAttribute("aria-hidden", "true");
-  el.menuBtn.setAttribute("aria-expanded", "false");
-}
-
-function toggleMenu() {
-  if (el.drawer.classList.contains("open")) closeMenu();
-  else openMenu();
 }
 
 /* --------------------------------------------------------------------- */
@@ -1792,7 +1670,6 @@ async function uploadDesignFile(file) {
     const grid = validateUploadedDesign(design);
     if (uploadToSavedDesigns) saveUploadedDesign(design, grid);
     else applyDesignData(design, grid);
-    closeMenu();
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "The file could not be read.";
@@ -1980,8 +1857,6 @@ function init() {
   updateCounts();
   setActive(state.active);
   recordHistory();
-  el.columnNumbers.hidden = !state.showColumnNumbers;
-  el.showColumnNumbers.checked = state.showColumnNumbers;
 
   el.plateTheme.addEventListener("click", () => {
     const whitePlate = luminance(state.plateColor) < 0.3;
@@ -1995,11 +1870,6 @@ function init() {
     addCustomColor(e.target.value)
   );
   el.clearAll.addEventListener("click", clearAll);
-  el.showColumnNumbers.addEventListener("change", (event) => {
-    state.showColumnNumbers = event.target.checked;
-    el.columnNumbers.hidden = !state.showColumnNumbers;
-    save();
-  });
   el.uploadDesign.addEventListener("click", () => {
     uploadToSavedDesigns = false;
     el.designFile.click();
@@ -2013,8 +1883,6 @@ function init() {
     if (file) uploadDesignFile(file);
   });
   el.downloadImage.addEventListener("click", () => downloadImage());
-  el.downloadCounts.addEventListener("click", downloadCounts);
-  el.downloadDesign.addEventListener("click", downloadDesign);
   el.shiftLeft.addEventListener("click", () => shiftColumns(-1));
   el.shiftRight.addEventListener("click", () => shiftColumns(1));
   el.undo.addEventListener("click", undo);
@@ -2025,10 +1893,6 @@ function init() {
 
   renderSavedDesigns();
   loadInspiration();
-  // Side menu (drawer)
-  el.menuBtn.addEventListener("click", toggleMenu);
-  el.drawerClose.addEventListener("click", closeMenu);
-  el.drawerOverlay.addEventListener("click", closeMenu);
   // Write-a-word tool (main screen): apply live, debounced as the user types.
   let textDebounce = null;
   el.textInput.addEventListener("input", () => {
@@ -2057,12 +1921,6 @@ function init() {
   });
   el.textInput.value = state.textValue;
   el.saveDesignBtn.addEventListener("click", saveDesign);
-  // Escape closes the drawer even while a menu input is focused (the color
-  // shortcut handler ignores keys typed into inputs, so add a dedicated one).
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && el.drawer.classList.contains("open")) closeMenu();
-  });
-
   document.addEventListener("keydown", onKeyDown);
   let mobileZoomMode = isMobileZoomMode();
   let mobileZoomOrientation = zoomOrientation();
