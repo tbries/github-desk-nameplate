@@ -214,42 +214,6 @@
           </button>
         </div>
 
-        <div
-          class="toolbar-group toolbar-file-actions"
-          aria-label="Design files"
-        >
-          <button
-            type="button"
-            id="upload-design"
-            class="toolbar-action-button"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 21V9" />
-              <path d="m7 14 5-5 5 5" />
-              <path d="M5 3h14" />
-            </svg>
-            <span>Upload</span>
-          </button>
-          <input
-            type="file"
-            id="design-file"
-            accept=".json,.png,application/json,image/png"
-            hidden
-          />
-          <button
-            type="button"
-            id="download-image"
-            class="toolbar-action-button"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3v12" />
-              <path d="m7 10 5 5 5-5" />
-              <path d="M5 21h14" />
-            </svg>
-            <span>Download</span>
-          </button>
-        </div>
-
         <div class="toolbar-group zoom-control" aria-label="Nameplate size">
           <button
             type="button"
@@ -271,55 +235,8 @@
         </div>
       </section>
 
-      <section
-        class="inspiration-section saved-designs-section"
-        id="saved-designs-section"
-        aria-labelledby="saved-designs-title"
-      >
-        <div class="section-heading">
-          <h2 id="saved-designs-title">My Designs</h2>
-        </div>
-        <div class="saved-design-actions">
-          <button type="button" id="save-design" class="save-design-button">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-            <span>Add</span>
-          </button>
-          <button
-            type="button"
-            id="upload-saved-design"
-            class="save-design-button save-design-button-secondary"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 21V9" />
-              <path d="m7 14 5-5 5 5" />
-              <path d="M5 3h14" />
-            </svg>
-            <span>Upload</span>
-          </button>
-        </div>
-        <div
-          class="inspiration-grid"
-          id="saved-designs-grid"
-          aria-label="My designs"
-          hidden
-        ></div>
-      </section>
-
-      <section class="inspiration-section" aria-labelledby="inspiration-title">
-        <div class="section-heading">
-          <h2 id="inspiration-title">Inspiration</h2>
-          <p>Start with an example, then make it your own. 🚀</p>
-        </div>
-        <div class="inspiration-grid" id="inspiration-grid">
-          <p class="inspiration-status">Loading examples...</p>
-        </div>
-      </section>
     </main>
 
-    <canvas id="export-canvas" hidden></canvas>
     <script src="font.js"></script>
     <script src="app.js"></script>
   </body>

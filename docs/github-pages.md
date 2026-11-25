@@ -13,15 +13,11 @@ Then open <http://localhost:8000/>. Alternatively, use the VS Code
 [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)
 extension or run `npx serve github-pages`.
 
-## Add inspiration designs
+## Legacy example design files
 
-- Inspiration designs live in [`github-pages/inspiration/`](../github-pages/inspiration/)
-as one JSON file per design.
-- Add each filename to
-[`github-pages/inspiration.json`](../github-pages/inspiration.json) so the
-planner can discover and display it.
-- Downloaded designs (json) use this same format and can be directly placed in the inspiration directory.
-- Downloaded design PNGs include the embededd JSON design data. They can also uploaded back into the designer.
+- Example designs live in [`github-pages/inspiration/`](../github-pages/inspiration/)
+as one JSON file per design. They are retained for reference; the editor no
+longer displays examples or imports and exports design files.
 - The `grid` property contains seven 52-character rows:
     - `.` is an empty spot in the grid
     - `r` red,

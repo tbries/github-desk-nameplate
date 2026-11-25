@@ -24,15 +24,6 @@ const CONFIG = {
 /* ===================== end of settings =================================== */
 
 const STORAGE_KEY = "nameplate-planner-v1";
-// Separate store for designs saved from the main designer.
-const SAVED_KEY = "nameplate-saved-v1";
-const INSPIRATION_INDEX = "inspiration.json";
-const PNG_DESIGN_KEYWORD = "NameplateDesign";
-const PNG_SIGNATURE = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-]);
-const UTF8_ENCODER = new TextEncoder();
-const UTF8_DECODER = new TextDecoder();
 const SHAPES = Object.freeze({
   heart: [
     ".##.##.",
@@ -54,9 +45,8 @@ const SHAPES = Object.freeze({
   ],
 });
 
-// Every nameplate location uses this geometry. Measurements are ratios of one
-// cell so previews, the editor, zoomed views, and exports keep identical
-// proportions.
+// Measurements are ratios of one cell so the nameplate keeps its proportions
+// as the editor is resized or zoomed.
 const NAMEPLATE_LAYOUT = Object.freeze({
   gapRatio: 0.2,
   paddingRatio: 1.1,
@@ -92,20 +82,6 @@ function validZoom(value, fallback) {
   return Number.isFinite(value)
     ? Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value))
     : fallback;
-}
-
-// Path to the GitHub mark SVG. It is recolored to the logo color both
-// on-screen (via CSS mask) and in the exported image (below).
-const LOGO_SRC = "github-mark-white.svg";
-let logoSvgPromise = null;
-
-function loadLogoSvg() {
-  if (!logoSvgPromise) {
-    logoSvgPromise = fetch(LOGO_SRC)
-      .then((r) => r.text())
-      .catch(() => null);
-  }
-  return logoSvgPromise;
 }
 
 const { rows, cols, colors } = CONFIG;
@@ -288,23 +264,14 @@ const el = {
   stage: document.getElementById("stage"),
   plateTheme: document.getElementById("plate-theme"),
   clearAll: document.getElementById("clear-all"),
-  uploadDesign: document.getElementById("upload-design"),
-  designFile: document.getElementById("design-file"),
-  downloadImage: document.getElementById("download-image"),
   shiftLeft: document.getElementById("shift-left"),
   shiftRight: document.getElementById("shift-right"),
   undo: document.getElementById("undo"),
   redo: document.getElementById("redo"),
-  canvas: document.getElementById("export-canvas"),
   zoomIn: document.getElementById("zoom-in"),
   zoomOut: document.getElementById("zoom-out"),
   zoomLabel: document.getElementById("zoom-label"),
   textInput: document.getElementById("text-input"),
-  saveDesignBtn: document.getElementById("save-design"),
-  uploadSavedDesign: document.getElementById("upload-saved-design"),
-  savedDesignsSection: document.getElementById("saved-designs-section"),
-  savedDesignsGrid: document.getElementById("saved-designs-grid"),
-  inspirationGrid: document.getElementById("inspiration-grid"),
 };
 
 const cellEls = []; // cellEls[r][c] -> button element
@@ -842,33 +809,6 @@ function encodeGrid() {
   return encoded;
 }
 
-function encodeDesignGrid(grid = state.grid) {
-  const encoded = [];
-  const isMatrix = Array.isArray(grid[0]);
-  for (let r = 0; r < rows; r++) {
-    let row = "";
-    for (let c = 0; c < cols; c++) {
-      const value = isMatrix ? grid[r][c] : grid[r * cols + c];
-      if (value === null) {
-        row += ".";
-      } else if (value < BUILT_IN_COLOR_COUNT) {
-        row += colors[value].key;
-      } else {
-        const customIndex = value - BUILT_IN_COLOR_COUNT;
-        if (customIndex < 9) {
-          row += String(customIndex + 1);
-        } else if (customIndex < 35) {
-          row += String.fromCharCode("A".charCodeAt(0) + customIndex - 9);
-        } else {
-          return null;
-        }
-      }
-    }
-    encoded.push(row);
-  }
-  return encoded;
-}
-
 function decodeGrid(g, colorCount = colors.length) {
   if (Array.isArray(g) && g.length === rows * cols) {
     return g.map((value) =>
@@ -1016,250 +956,6 @@ function redo() {
   undoStack.push(snapshot);
   restoreHistoryState(snapshot);
   updateHistoryButtons();
-}
-
-/* --------------------------------------------------------------------- */
-/* Downloads                                                             */
-/* --------------------------------------------------------------------- */
-function prepareExportCanvas(width, height, scale = 2) {
-  const canvas = el.canvas;
-  canvas.width = width * scale;
-  canvas.height = height * scale;
-  const ctx = canvas.getContext("2d");
-  ctx.scale(scale, scale);
-  return { canvas, ctx };
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = url;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-function canvasToPngBlob(canvas) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("The image could not be created."));
-    }, "image/png");
-  });
-}
-
-function hasPngSignature(bytes) {
-  return (
-    bytes.length >= PNG_SIGNATURE.length &&
-    PNG_SIGNATURE.every((value, index) => bytes[index] === value)
-  );
-}
-
-function readUint32(bytes, offset) {
-  return new DataView(
-    bytes.buffer,
-    bytes.byteOffset + offset,
-    4
-  ).getUint32(0);
-}
-
-let pngCrcTable = null;
-
-function pngCrc32(bytes) {
-  if (!pngCrcTable) {
-    pngCrcTable = new Uint32Array(256);
-    for (let n = 0; n < pngCrcTable.length; n++) {
-      let value = n;
-      for (let bit = 0; bit < 8; bit++) {
-        value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-      }
-      pngCrcTable[n] = value >>> 0;
-    }
-  }
-
-  let crc = 0xffffffff;
-  for (const byte of bytes) {
-    crc = pngCrcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function createPngChunk(type, data) {
-  const typeBytes = UTF8_ENCODER.encode(type);
-  const chunk = new Uint8Array(12 + data.length);
-  const view = new DataView(chunk.buffer);
-  view.setUint32(0, data.length);
-  chunk.set(typeBytes, 4);
-  chunk.set(data, 8);
-
-  const crcInput = new Uint8Array(typeBytes.length + data.length);
-  crcInput.set(typeBytes);
-  crcInput.set(data, typeBytes.length);
-  view.setUint32(8 + data.length, pngCrc32(crcInput));
-  return chunk;
-}
-
-function createDesignPngChunk(design) {
-  const keyword = UTF8_ENCODER.encode(PNG_DESIGN_KEYWORD);
-  const json = UTF8_ENCODER.encode(JSON.stringify(design));
-  const data = new Uint8Array(keyword.length + 5 + json.length);
-  data.set(keyword);
-
-  let offset = keyword.length + 1;
-  data[offset++] = 0; // Uncompressed iTXt.
-  data[offset++] = 0;
-  data[offset++] = 0; // Empty language tag.
-  data[offset++] = 0; // Empty translated keyword.
-  data.set(json, offset);
-  return createPngChunk("iTXt", data);
-}
-
-function embedDesignInPng(bytes, design) {
-  if (!hasPngSignature(bytes)) throw new Error("The exported PNG is invalid.");
-
-  let offset = PNG_SIGNATURE.length;
-  while (offset + 12 <= bytes.length) {
-    const length = readUint32(bytes, offset);
-    const chunkEnd = offset + 12 + length;
-    if (chunkEnd > bytes.length) throw new Error("The exported PNG is invalid.");
-
-    const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
-    if (type === "IEND") {
-      const metadata = createDesignPngChunk(design);
-      const result = new Uint8Array(bytes.length + metadata.length);
-      result.set(bytes.subarray(0, offset));
-      result.set(metadata, offset);
-      result.set(bytes.subarray(offset), offset + metadata.length);
-      return result;
-    }
-    offset = chunkEnd;
-  }
-
-  throw new Error("The exported PNG is missing its end marker.");
-}
-
-async function downloadImage(source = {}) {
-  const grid = source.grid || state.grid;
-  const plateColor = source.plate || state.plateColor;
-  const logoColor = source.logo || state.logoColor;
-  const customColors = source.customColors || customColorValues();
-  const design = createDownloadDesign({
-    grid,
-    plateColor,
-    logoColor,
-    customColors,
-  });
-  if (!design) {
-    alert("Design downloads support up to 35 custom colors.");
-    return;
-  }
-
-  const scale = 2;
-  const cell = 24;
-  const metrics = getNameplateMetrics(cell);
-  const exportWidth = Math.ceil(metrics.width);
-  const exportHeight = Math.ceil(metrics.height);
-
-  const { canvas, ctx } = prepareExportCanvas(
-    exportWidth,
-    exportHeight,
-    scale
-  );
-
-  ctx.fillStyle = plateColor;
-  roundRect(ctx, 0, 0, exportWidth, exportHeight, metrics.plateRadius);
-  ctx.fill();
-
-  const exportColors = [
-    ...colors.slice(0, BUILT_IN_COLOR_COUNT).map((color) => color.color),
-    ...customColors,
-  ];
-  const isMatrix = Array.isArray(grid[0]);
-  const gx = metrics.padding + metrics.logoSize + metrics.padding;
-  const gy = metrics.padding;
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++) {
-      const x = gx + c * (cell + metrics.gap);
-      const y = gy + r * (cell + metrics.gap);
-      const v = isMatrix ? grid[r][c] : grid[r * cols + c];
-      ctx.fillStyle =
-        v === null ? emptyCellColor(plateColor) : exportColors[v];
-      roundRect(ctx, x, y, cell, cell, metrics.cellRadius);
-      ctx.fill();
-    }
-
-  await drawLogoOnCanvas(
-    ctx,
-    metrics.padding,
-    metrics.padding,
-    metrics.logoSize,
-    logoColor
-  );
-  try {
-    const blob = await canvasToPngBlob(canvas);
-    const png = embedDesignInPng(
-      new Uint8Array(await blob.arrayBuffer()),
-      design
-    );
-    downloadBlob(new Blob([png], { type: "image/png" }), "nameplate.png");
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "The image could not be created.";
-    alert(`Could not download design: ${message}`);
-  }
-}
-
-function createDownloadDesign({
-  grid = state.grid,
-  plateColor = state.plateColor,
-  logoColor = state.logoColor,
-  customColors = customColorValues(),
-} = {}) {
-  const encodedGrid = encodeDesignGrid(grid);
-  if (!encodedGrid) return null;
-
-  const design = {
-    name: "nameplate-design",
-    plate: plateColor,
-    logo: logoColor,
-    grid: encodedGrid,
-  };
-  if (customColors.length) design.customColors = customColors;
-  return design;
-}
-
-function drawLogoOnCanvas(ctx, x, y, size, logoColor) {
-  return loadLogoSvg().then((svg) => {
-    if (!svg) return;
-    const colored = svg.replace(/fill="white"/g, `fill="${logoColor}"`);
-    const url =
-      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(colored);
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const ar = img.width / img.height || 1;
-        let w = size,
-          h = size;
-        if (ar >= 1) h = size / ar;
-        else w = size * ar;
-        ctx.drawImage(img, x + (size - w) / 2, y + (size - h) / 2, w, h);
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = url;
-    });
-  });
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  const rr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
 }
 
 /* --------------------------------------------------------------------- */
@@ -1417,308 +1113,6 @@ function setTextAlign(align) {
   if (el.textInput.value) applyText(el.textInput.value);
 }
 
-/* --------------------------------------------------------------------- */
-/* Saved designs                                                         */
-/* --------------------------------------------------------------------- */
-function loadSaved() {
-  try {
-    const arr = JSON.parse(localStorage.getItem(SAVED_KEY) || "[]");
-    return Array.isArray(arr) ? arr : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function persistSaved(arr) {
-  try {
-    localStorage.setItem(SAVED_KEY, JSON.stringify(arr));
-  } catch (_) {
-    /* storage unavailable — ignore */
-  }
-}
-
-function createSavedDesignId() {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function saveDesign() {
-  const arr = loadSaved();
-  arr.push({
-    id: createSavedDesignId(),
-    g: encodeGrid(),
-    plate: state.plateColor,
-    logo: state.logoColor,
-    customColors: customColorValues(),
-    savedAt: Date.now(),
-  });
-  persistSaved(arr);
-  renderSavedDesigns();
-}
-
-function designGridString(design) {
-  const designCustomColors = getDesignCustomColors(design);
-  const designColorCount = BUILT_IN_COLOR_COUNT + designCustomColors.length;
-  if (Array.isArray(design.g) || typeof design.g === "string")
-    return decodeGrid(design.g, designColorCount);
-  if (
-    Array.isArray(design.grid) &&
-    design.grid.length === rows &&
-    design.grid.every((row) => typeof row === "string" && row.length === cols)
-  ) {
-    const encoded = [];
-    for (const ch of design.grid.join("")) {
-      if (ch === ".") {
-        encoded.push(null);
-        continue;
-      }
-      if (ch === "c" && designCustomColors.length) {
-        encoded.push(BUILT_IN_COLOR_COUNT);
-        continue;
-      }
-      const colorIndex = colors
-        .slice(0, BUILT_IN_COLOR_COUNT)
-        .findIndex((color) => color.key === ch);
-      if (colorIndex >= 0) {
-        encoded.push(colorIndex);
-        continue;
-      }
-      if (/^[A-Z]$/.test(ch)) {
-        const customNumber = ch.charCodeAt(0) - "A".charCodeAt(0) + 10;
-        if (customNumber <= designCustomColors.length) {
-          encoded.push(BUILT_IN_COLOR_COUNT + customNumber - 1);
-          continue;
-        }
-      }
-      const customNumber = Number(ch);
-      if (
-        Number.isInteger(customNumber) &&
-        customNumber > 0 &&
-        customNumber <= designCustomColors.length
-      ) {
-        encoded.push(BUILT_IN_COLOR_COUNT + customNumber - 1);
-        continue;
-      }
-      const legacyIndex = parseInt(ch, 36);
-      if (!Number.isInteger(legacyIndex) || legacyIndex >= designColorCount)
-        return null;
-      encoded.push(legacyIndex);
-    }
-    return encoded;
-  }
-  return null;
-}
-
-function getDesignCustomColors(design) {
-  if (Array.isArray(design.customColors)) return design.customColors;
-  return typeof design.custom === "string" ? [design.custom] : [];
-}
-
-function applyDesignData(design, grid) {
-  restoreCustomColors(design.customColors, design.custom);
-  applyGridString(grid);
-  if (typeof design.plate === "string") state.plateColor = design.plate;
-  if (typeof design.logo === "string") state.logoColor = design.logo;
-  state.highlight = null;
-  state.lastModified = null;
-  state.arrowStart = null;
-  applyColors();
-  buildPalette();
-  repaintAll();
-  updateCounts();
-  setActive(state.active);
-  save();
-  recordHistory();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function validateUploadedDesign(design) {
-  if (!design || typeof design !== "object" || Array.isArray(design))
-    throw new Error("The file must contain a JSON design object.");
-  if (typeof design.name !== "string" || !design.name.trim())
-    throw new Error("The design must include a name.");
-  if (!/^#[0-9a-f]{6}$/i.test(design.plate))
-    throw new Error("The design must include a six-digit plate color.");
-  if (!/^#[0-9a-f]{6}$/i.test(design.logo))
-    throw new Error("The design must include a six-digit logo color.");
-
-  const customColors = design.customColors ?? [];
-  if (
-    !Array.isArray(customColors) ||
-    customColors.length > 35 ||
-    customColors.some((color) => !/^#[0-9a-f]{6}$/i.test(color))
-  ) {
-    throw new Error("Custom colors must be an array of up to 35 hex colors.");
-  }
-  if (
-    !Array.isArray(design.grid) ||
-    design.grid.length !== rows ||
-    !design.grid.every(
-      (row) => typeof row === "string" && row.length === cols
-    )
-  ) {
-    throw new Error(`The grid must contain ${rows} rows of ${cols} characters.`);
-  }
-  const builtInKeys = new Set(
-    colors.slice(0, BUILT_IN_COLOR_COUNT).map((color) => color.key)
-  );
-  for (const ch of design.grid.join("")) {
-    if (ch === "." || builtInKeys.has(ch)) continue;
-    if (/^[1-9]$/.test(ch) && Number(ch) <= customColors.length) continue;
-    if (
-      /^[A-Z]$/.test(ch) &&
-      ch.charCodeAt(0) - "A".charCodeAt(0) + 10 <= customColors.length
-    ) {
-      continue;
-    }
-    throw new Error(`The grid contains an unknown color reference: ${ch}`);
-  }
-
-  const grid = designGridString(design);
-  if (!grid) throw new Error("The grid contains an unknown color reference.");
-  return grid;
-}
-
-function findNullByte(bytes, start, end) {
-  for (let offset = start; offset < end; offset++) {
-    if (bytes[offset] === 0) return offset;
-  }
-  return -1;
-}
-
-function readDesignPngChunk(data) {
-  const keywordEnd = findNullByte(data, 0, data.length);
-  if (keywordEnd < 0) return null;
-
-  const keyword = UTF8_DECODER.decode(data.subarray(0, keywordEnd));
-  if (keyword !== PNG_DESIGN_KEYWORD) return null;
-
-  const compressionFlagOffset = keywordEnd + 1;
-  if (compressionFlagOffset + 4 > data.length)
-    throw new Error("The embedded design metadata is invalid.");
-  if (data[compressionFlagOffset] !== 0)
-    throw new Error("The embedded design metadata is compressed.");
-
-  const languageEnd = findNullByte(
-    data,
-    compressionFlagOffset + 2,
-    data.length
-  );
-  if (languageEnd < 0)
-    throw new Error("The embedded design metadata is invalid.");
-  const translatedKeywordEnd = findNullByte(
-    data,
-    languageEnd + 1,
-    data.length
-  );
-  if (translatedKeywordEnd < 0)
-    throw new Error("The embedded design metadata is invalid.");
-
-  return UTF8_DECODER.decode(data.subarray(translatedKeywordEnd + 1));
-}
-
-function extractDesignFromPng(bytes) {
-  if (!hasPngSignature(bytes)) throw new Error("The PNG file is invalid.");
-
-  let offset = PNG_SIGNATURE.length;
-  while (offset + 12 <= bytes.length) {
-    const length = readUint32(bytes, offset);
-    const dataStart = offset + 8;
-    const dataEnd = dataStart + length;
-    const chunkEnd = dataEnd + 4;
-    if (chunkEnd > bytes.length) throw new Error("The PNG file is invalid.");
-
-    const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
-    if (type === "iTXt") {
-      const json = readDesignPngChunk(bytes.subarray(dataStart, dataEnd));
-      if (json !== null) return JSON.parse(json);
-    }
-    if (type === "IEND") break;
-    offset = chunkEnd;
-  }
-
-  throw new Error("This PNG does not contain an embedded nameplate design.");
-}
-
-async function readUploadedDesign(file) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const expectsPng = file.type === "image/png" || /\.png$/i.test(file.name);
-  if (hasPngSignature(bytes)) return extractDesignFromPng(bytes);
-  if (expectsPng) throw new Error("The PNG file is invalid.");
-  return JSON.parse(UTF8_DECODER.decode(bytes));
-}
-
-function saveUploadedDesign(design, grid) {
-  const designs = loadSaved();
-  designs.push({
-    id: createSavedDesignId(),
-    g: grid,
-    plate: design.plate,
-    logo: design.logo,
-    customColors: getDesignCustomColors(design),
-    savedAt: Date.now(),
-  });
-  persistSaved(designs);
-  renderSavedDesigns();
-}
-
-let uploadToSavedDesigns = false;
-
-async function uploadDesignFile(file) {
-  try {
-    const design = await readUploadedDesign(file);
-    const grid = validateUploadedDesign(design);
-    if (uploadToSavedDesigns) saveUploadedDesign(design, grid);
-    else applyDesignData(design, grid);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "The file could not be read.";
-    alert(`Could not upload design: ${message}`);
-  } finally {
-    el.designFile.value = "";
-    uploadToSavedDesigns = false;
-  }
-}
-
-function createDesignCard(design, grid, ariaLabel) {
-  const card = document.createElement("button");
-  card.type = "button";
-  card.className = "inspiration-card";
-  card.setAttribute("aria-label", ariaLabel);
-  card.addEventListener("click", () => applyDesignData(design, grid));
-
-  const preview = document.createElement("div");
-  preview.className = "inspiration-preview";
-  const designCustomColors = getDesignCustomColors(design);
-  const previewColors = [
-    ...colors.slice(0, BUILT_IN_COLOR_COUNT).map((color) => color.color),
-    ...designCustomColors,
-  ];
-  const rendered = createNameplate({
-    grid,
-    palette: previewColors,
-    plateColor: design.plate || CONFIG.defaultPlateColor,
-    logoColor: design.logo || CONFIG.defaultLogoColor,
-    showShadow: false,
-    showCellDepth: false,
-    decorative: true,
-  });
-  preview.appendChild(rendered.plate);
-  card.appendChild(preview);
-  return card;
-}
-
-function fitNameplatePreviews(root = document) {
-  const previews = [...root.querySelectorAll(".inspiration-preview")]
-    .map((preview) => ({
-      plate: preview.querySelector(".nameplate"),
-      width: preview.clientWidth,
-    }))
-    .filter(({ plate }) => plate);
-  for (const { plate, width } of previews)
-    fitNameplateToWidth(plate, width);
-}
-
 let layoutFitFrame = null;
 
 function scheduleLayoutFit() {
@@ -1726,128 +1120,10 @@ function scheduleLayoutFit() {
   layoutFitFrame = requestAnimationFrame(() => {
     layoutFitFrame = null;
     fitPlate();
-    fitNameplatePreviews();
   });
-}
-
-function renderInspiration(designs) {
-  el.inspirationGrid.innerHTML = "";
-  if (!designs.length) {
-    el.inspirationGrid.innerHTML =
-      '<p class="inspiration-status">No examples are available yet.</p>';
-    return;
-  }
-
-  designs.forEach((design) => {
-    const grid = designGridString(design);
-    if (!grid) return;
-    el.inspirationGrid.appendChild(
-      createDesignCard(
-        design,
-        grid,
-        `Use ${design.name || "inspirational"} design`
-      )
-    );
-  });
-  fitNameplatePreviews(el.inspirationGrid);
-}
-
-async function loadInspiration() {
-  try {
-    const indexResponse = await fetch(INSPIRATION_INDEX);
-    if (!indexResponse.ok) throw new Error("Unable to load inspiration index");
-    const files = await indexResponse.json();
-    if (!Array.isArray(files)) throw new Error("Invalid inspiration index");
-    const responses = await Promise.all(
-      files.map((file) => fetch(`inspiration/${file}`))
-    );
-    if (responses.some((response) => !response.ok))
-      throw new Error("Unable to load an inspiration design");
-    renderInspiration(await Promise.all(responses.map((r) => r.json())));
-  } catch (error) {
-    console.error(error);
-    el.inspirationGrid.innerHTML =
-      '<p class="inspiration-status">Examples could not be loaded.</p>';
-  }
-}
-
-function sameSavedDesign(left, right) {
-  if (left.id && right.id) return left.id === right.id;
-  return (
-    left.savedAt === right.savedAt &&
-    left.name === right.name &&
-    JSON.stringify(left.g) === JSON.stringify(right.g)
-  );
-}
-
-function deleteDesign(design) {
-  const designs = loadSaved();
-  const index = designs.findIndex((entry) => sameSavedDesign(entry, design));
-  if (index < 0) return;
-  designs.splice(index, 1);
-  persistSaved(designs);
-  renderSavedDesigns();
-}
-
-function renderSavedDesigns() {
-  const designs = loadSaved().sort(
-    (a, b) => (b.savedAt || 0) - (a.savedAt || 0)
-  );
-  el.savedDesignsGrid.innerHTML = "";
-  for (const design of designs) {
-    const grid = designGridString(design);
-    if (!grid) continue;
-
-    const item = document.createElement("div");
-    item.className = "saved-design-item";
-    item.appendChild(createDesignCard(design, grid, "Load saved design"));
-
-    const downloadButton = document.createElement("button");
-    downloadButton.type = "button";
-    downloadButton.className = "saved-design-download";
-    downloadButton.setAttribute("aria-label", "Download saved design as PNG");
-    downloadButton.title = "Download";
-    downloadButton.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 3v12"></path>
-        <path d="m7 10 5 5 5-5"></path>
-        <path d="M5 21h14"></path>
-      </svg>
-      <span>Download</span>`;
-    downloadButton.addEventListener("click", () =>
-      downloadImage({
-        grid,
-        plate: design.plate || CONFIG.defaultPlateColor,
-        logo: design.logo || CONFIG.defaultLogoColor,
-        customColors: getDesignCustomColors(design),
-      })
-    );
-    item.appendChild(downloadButton);
-
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "saved-design-delete";
-    deleteButton.setAttribute("aria-label", "Delete saved design");
-    deleteButton.title = "Delete saved design";
-    deleteButton.innerHTML =
-      '<span aria-hidden="true">×</span><span>Remove</span>';
-    deleteButton.addEventListener("click", () => {
-      if (confirm("Delete this saved design?")) deleteDesign(design);
-    });
-    item.appendChild(deleteButton);
-    el.savedDesignsGrid.appendChild(item);
-  }
-  const hasSavedDesigns = el.savedDesignsGrid.childElementCount > 0;
-  el.savedDesignsSection.classList.toggle(
-    "has-saved-designs",
-    hasSavedDesigns
-  );
-  el.savedDesignsGrid.hidden = !hasSavedDesigns;
-  fitNameplatePreviews(el.savedDesignsGrid);
 }
 
 function init() {
-  loadLogoSvg(); // warm the SVG so exports are instant
   load();
   buildGrid();
   buildPalette();
@@ -1870,19 +1146,6 @@ function init() {
     addCustomColor(e.target.value)
   );
   el.clearAll.addEventListener("click", clearAll);
-  el.uploadDesign.addEventListener("click", () => {
-    uploadToSavedDesigns = false;
-    el.designFile.click();
-  });
-  el.uploadSavedDesign.addEventListener("click", () => {
-    uploadToSavedDesigns = true;
-    el.designFile.click();
-  });
-  el.designFile.addEventListener("change", () => {
-    const [file] = el.designFile.files;
-    if (file) uploadDesignFile(file);
-  });
-  el.downloadImage.addEventListener("click", () => downloadImage());
   el.shiftLeft.addEventListener("click", () => shiftColumns(-1));
   el.shiftRight.addEventListener("click", () => shiftColumns(1));
   el.undo.addEventListener("click", undo);
@@ -1891,8 +1154,6 @@ function init() {
   el.zoomOut.addEventListener("click", () => setZoom(state.zoom - ZOOM_STEP));
   setZoom(state.zoom, false); // initialize label + button disabled states
 
-  renderSavedDesigns();
-  loadInspiration();
   // Write-a-word tool (main screen): apply live, debounced as the user types.
   let textDebounce = null;
   el.textInput.addEventListener("input", () => {
@@ -1920,7 +1181,6 @@ function init() {
     button.addEventListener("click", () => addShape(button.dataset.shape));
   });
   el.textInput.value = state.textValue;
-  el.saveDesignBtn.addEventListener("click", saveDesign);
   document.addEventListener("keydown", onKeyDown);
   let mobileZoomMode = isMobileZoomMode();
   let mobileZoomOrientation = zoomOrientation();
