@@ -45,41 +45,30 @@
           />
         </svg>
       </button>
-      <h1>Nameplate Designer</h1>
-      <div class="appearance-controls" aria-label="Nameplate controls">
-        <label class="color-field header-color-field">
-          <span>Plate</span>
-          <input
-            type="color"
-            id="plate-color"
-            value="#000000"
-            aria-label="Nameplate color"
-          />
-        </label>
-        <label class="color-field header-color-field">
-          <span>Logo</span>
-          <input
-            type="color"
-            id="logo-color"
-            value="#ffffff"
-            aria-label="Logo color"
-          />
-        </label>
-        <div class="color-field header-color-field">
-          <span>Reset</span>
-          <button
-            type="button"
-            id="clear-all"
-            class="header-reset"
-            aria-label="Clear all dots"
-            title="Clear all dots"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 4v6h6" />
-              <path d="M5.5 15a7 7 0 1 0 .7-7.8L4 10" />
-            </svg>
-          </button>
-        </div>
+      <button
+        type="button"
+        id="plate-theme"
+        class="plate-theme"
+        aria-label="Swap plate &amp; logo colors: Switch to white plate with black logo"
+        title="Switch to white plate with black logo"
+      >
+        <span class="plate-theme-icon" aria-hidden="true"></span>
+        <span>Swap plate &amp; logo colors</span>
+      </button>
+      <div class="color-field header-color-field header-reset-field">
+        <span>Reset</span>
+        <button
+          type="button"
+          id="clear-all"
+          class="header-reset"
+          aria-label="Clear all dots"
+          title="Clear all dots"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 4v6h6" />
+            <path d="M5.5 15a7 7 0 1 0 .7-7.8L4 10" />
+          </svg>
+        </button>
       </div>
     </header>
 

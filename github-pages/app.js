@@ -311,8 +311,7 @@ const el = {
   showColumnNumbers: document.getElementById("show-column-numbers"),
   customColor: document.getElementById("custom-color"),
   stage: document.getElementById("stage"),
-  plateColor: document.getElementById("plate-color"),
-  logoColor: document.getElementById("logo-color"),
+  plateTheme: document.getElementById("plate-theme"),
   clearAll: document.getElementById("clear-all"),
   uploadDesign: document.getElementById("upload-design"),
   designFile: document.getElementById("design-file"),
@@ -700,8 +699,16 @@ function updateCounts() {
 
 function applyColors() {
   setNameplateColors(el.plate, state.plateColor, state.logoColor);
-  el.plateColor.value = state.plateColor;
-  el.logoColor.value = state.logoColor;
+  const whitePlate = luminance(state.plateColor) < 0.3;
+  el.plateTheme.style.backgroundColor = whitePlate ? "#ffffff" : "#000000";
+  el.plateTheme.style.color = whitePlate ? "#000000" : "#ffffff";
+  el.plateTheme.title = whitePlate
+    ? "Switch to white plate with black logo"
+    : "Switch to black plate with white logo";
+  el.plateTheme.setAttribute(
+    "aria-label",
+    `Swap plate & logo colors: ${el.plateTheme.title}`
+  );
 }
 
 // Size the dots so the whole plate fits the available width. Mobile starts with
@@ -1976,18 +1983,14 @@ function init() {
   el.columnNumbers.hidden = !state.showColumnNumbers;
   el.showColumnNumbers.checked = state.showColumnNumbers;
 
-  el.plateColor.addEventListener("input", (e) => {
-    state.plateColor = e.target.value;
+  el.plateTheme.addEventListener("click", () => {
+    const whitePlate = luminance(state.plateColor) < 0.3;
+    state.plateColor = whitePlate ? "#ffffff" : "#000000";
+    state.logoColor = whitePlate ? "#000000" : "#ffffff";
     applyColors();
     save();
+    recordHistory();
   });
-  el.plateColor.addEventListener("change", recordHistory);
-  el.logoColor.addEventListener("input", (e) => {
-    state.logoColor = e.target.value;
-    applyColors();
-    save();
-  });
-  el.logoColor.addEventListener("change", recordHistory);
   el.customColor.addEventListener("change", (e) =>
     addCustomColor(e.target.value)
   );
