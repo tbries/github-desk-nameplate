@@ -29,10 +29,10 @@ body {
 }
 
 .app-header {
-  display: grid;
-  grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr);
-  column-gap: 8px;
-  align-items: end;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 8px;
   padding: 10px 14px 0;
   text-align: center;
 }
@@ -267,19 +267,8 @@ main {
   cursor: default;
 }
 
-.color-field {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.plate-theme {
-  grid-column: 2;
+.header-action {
+  min-width: 0;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -315,7 +304,7 @@ main {
   mask: url("github-mark-white.svg") center / contain no-repeat;
 }
 
-.plate-theme:hover {
+.header-action:hover {
   transform: translateY(-2px) scale(1.04);
   border-color: var(--muted);
   box-shadow:
@@ -323,7 +312,7 @@ main {
     0 6px 14px rgba(31, 35, 40, 0.12);
 }
 
-.plate-theme:focus-visible {
+.header-action:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow:
@@ -331,23 +320,8 @@ main {
     0 4px 12px rgba(31, 35, 40, 0.12);
 }
 
-.header-color-field {
-  font-size: 0.65rem;
-}
-
-.header-reset-field {
-  justify-self: end;
-}
-
 .header-reset {
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
+  flex-shrink: 0;
   background: var(--panel);
   color: #cf222e;
   cursor: pointer;
@@ -359,13 +333,16 @@ main {
 }
 
 .header-reset:focus-visible {
-  outline: 3px solid rgba(207, 34, 46, 0.2);
-  outline-offset: 2px;
+  border-color: #cf222e;
+  box-shadow:
+    0 0 0 3px rgba(207, 34, 46, 0.2),
+    0 4px 12px rgba(31, 35, 40, 0.12);
 }
 
 .header-reset svg {
-  width: 100%;
-  height: 100%;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
