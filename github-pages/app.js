@@ -28,6 +28,7 @@ const CONFIG = {
 /* ===================== end of settings =================================== */
 
 const STORAGE_KEY = "nameplate-planner-v2";
+// "#" uses the selected color; letters use the palette's shortcut colors.
 const SHAPES = Object.freeze({
   heart: [
     ".##.##.",
@@ -46,6 +47,15 @@ const SHAPES = Object.freeze({
     "..#..##..#..",
     "###......###",
     "...######...",
+  ],
+  "copilot-cli": [
+    "...ppp...",
+    ".ccccccc.",
+    ".c..c..c.",
+    "pccc.cccp",
+    "pp.a.a.pp",
+    ".p.....p.",
+    "..ppppp..",
   ],
 });
 
@@ -920,9 +930,19 @@ function addShape(shapeName) {
     return;
   }
 
+  const palette = new Map(colors.map((color, index) => [color.key, index]));
+  const pattern = shape.map((row) =>
+    [...row].map((cell) => {
+      if (cell === ".") return null;
+      if (cell === "#") return state.active;
+      const index = palette.get(cell);
+      if (index === undefined) throw new Error(`Unknown shape color: ${cell}`);
+      return index;
+    })
+  );
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < width; c++) {
-      if (shape[r][c] === "#") state.grid[r][start + c] = state.active;
+      if (pattern[r][c] !== null) state.grid[r][start + c] = pattern[r][c];
     }
   }
 
