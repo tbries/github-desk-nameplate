@@ -27,7 +27,6 @@ const STORAGE_KEY = "nameplate-planner-v1";
 // Separate store for designs saved from the main designer.
 const SAVED_KEY = "nameplate-saved-v1";
 const INSPIRATION_INDEX = "inspiration.json";
-const SUBTITLES_SRC = "subtitles.json";
 const PNG_DESIGN_KEYWORD = "NameplateDesign";
 const PNG_SIGNATURE = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -304,7 +303,6 @@ const state = {
 
 // DOM references
 const el = {
-  subtitle: document.getElementById("subtitle"),
   nameplateHost: document.getElementById("nameplate-host"),
   plate: null,
   grid: null,
@@ -344,27 +342,6 @@ const el = {
 const cellEls = []; // cellEls[r][c] -> button element
 const undoStack = [];
 const redoStack = [];
-
-async function loadSubtitle() {
-  try {
-    const response = await fetch(SUBTITLES_SRC);
-    if (!response.ok) throw new Error("Unable to load subtitles");
-    const subtitles = await response.json();
-    if (
-      !Array.isArray(subtitles) ||
-      !subtitles.length ||
-      subtitles.some((subtitle) => typeof subtitle !== "string" || !subtitle)
-    ) {
-      throw new Error("Invalid subtitles");
-    }
-    el.subtitle.textContent =
-      subtitles[Math.floor(Math.random() * subtitles.length)];
-  } catch (error) {
-    console.error(error);
-  } finally {
-    el.subtitle.classList.remove("subtitle-loading");
-  }
-}
 
 /* --------------------------------------------------------------------- */
 /* Build UI                                                              */
@@ -1986,7 +1963,6 @@ function renderSavedDesigns() {
 }
 
 function init() {
-  loadSubtitle();
   loadLogoSvg(); // warm the SVG so exports are instant
   load();
   buildGrid();

@@ -41,17 +41,6 @@ body {
   padding: 0 78px;
 }
 
-.subtitle {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  padding: 0 78px;
-}
-
-.subtitle-loading {
-  visibility: hidden;
-}
-
 main {
   max-width: 1100px;
   margin: 0 auto;
@@ -452,11 +441,6 @@ main {
     white-space: nowrap;
   }
 
-  .subtitle {
-    margin-top: 6px;
-    padding: 0;
-  }
-
   .appearance-controls {
     position: static;
     justify-content: center;
@@ -675,7 +659,7 @@ kbd {
 .stage-wrap {
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  /* Pull up into the header so the nameplate sits closer to the subtitle,
+  /* Pull up into the header so the nameplate sits closer to the title,
      while the stage keeps its top padding as shadow room. */
   margin-top: -14px;
   padding: 0;
