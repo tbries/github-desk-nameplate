@@ -228,6 +228,7 @@ main {
   cursor: pointer;
 }
 
+.shape-btn,
 .history-btn {
   display: inline-flex;
   align-items: center;
@@ -293,6 +294,10 @@ main {
     transform 0.16s ease,
     border-color 0.16s ease,
     box-shadow 0.16s ease;
+}
+
+.mona-icon {
+  object-fit: contain;
 }
 
 .plate-theme-icon {
