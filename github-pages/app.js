@@ -57,6 +57,15 @@ const SHAPES = Object.freeze({
     ".p.....p.",
     "..ppppp..",
   ],
+  duckie: [
+    "...yy..",
+    "..yyyy.",
+    "..yyky.",
+    "yyyyyoo",
+    "yyyyyy.",
+    ".yyyyy.",
+    "..yyy..",
+  ],
 });
 
 // Measurements are ratios of one cell so the nameplate keeps its proportions
